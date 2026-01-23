@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Estación - Urdido</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+  <nav class="navbar navbar-expand-lg bg-white border-bottom">
+    <div class="container">
+      <a class="navbar-brand" href="/dashboard.html">← Dashboard</a>
+      <div class="ms-auto">
+        <button class="btn btn-outline-secondary btn-sm" onclick="logout()">Salir</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container py-4">
+    <div id="err" class="alert alert-danger d-none"></div>
+
+    <div class="d-flex align-items-start justify-content-between mb-3">
+      <div>
+        <h3 id="title" class="mb-1">Estación</h3>
+        <div id="turno" class="text-muted"></div>
+      </div>
+      <button class="btn btn-outline-primary btn-sm" id="refresh">Actualizar</button>
+    </div>
+
+    <div class="row g-3">
+      <div class="col-12 col-lg-6">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <h5>Responsables</h5>
+
+            <div class="mb-2">
+              <label class="form-label">Encargado (por defecto según turno)</label>
+              <input id="encargado" class="form-control" disabled />
+            </div>
+
+            <div class="mb-2">
+              <label class="form-label">Ayudante</label>
+              <input id="ayudante" class="form-control" placeholder="Nombre del ayudante" />
+            </div>
+
+            <div class="text-muted" style="font-size:.9rem;">
+              Nota: el “Editar encargado” formal se hace vía GERENTE/SISTEMAS en la asignación por turno (endpoint).
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 col-lg-6">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <h5>Tela y fajas</h5>
+
+            <div class="mb-2">Tela actual: <strong id="tela"></strong></div>
+            <div class="mb-2">Total fajas: <strong id="total"></strong></div>
+            <div class="mb-3">Faja siguiente (inicio): <strong id="inicio"></strong></div>
+
+            <div class="mb-2">
+              <label class="form-label">Faja final urdida (al terminar)</label>
+              <input id="fajaFin" type="number" class="form-control" min="1" />
+            </div>
+
+            <div class="mb-2">
+              <label class="form-label">Observaciones</label>
+              <textarea id="obs" class="form-control" rows="3"></textarea>
+            </div>
+
+            <div class="d-flex gap-2 mt-3">
+              <button id="btnStart" class="btn btn-success w-50">Iniciar turno</button>
+              <button id="btnEnd" class="btn btn-danger w-50">Terminar turno</button>
+            </div>
+
+            <div class="mt-3">
+              <span class="badge text-bg-secondary" id="statusBadge">Sin estado</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="/app.js"></script>
+  <script>
+    mustAuth();
+    const stationId = Number(qs("id"));
+
+    if (!stationId) window.location.href = "/dashboard.html";
+
+    function setErr(message) {
+      const err = document.getElementById("err");
+      err.textContent = message;
+      err.classList.remove("d-none");
+    }
+
+    function clearErr() {
+      const err = document.getElementById("err");
+      err.textContent = "";
+      err.classList.add("d-none");
+    }
+
+    function setStatus(text, kind) {
+      const b = document.getElementById("statusBadge");
+      b.textContent = text;
+      b.className = "badge " + kind;
+    }
+
+    async function load() {
+      clearErr();
+      try {
+        const data = await api(`/api/stations/${stationId}`);
+
+        document.getElementById("title").textContent = `Estación ${data.station.codigo}`;
+        document.getElementById("turno").textContent = `Turno: ${data.shift.nombre} (${data.shift.hora_inicio}–${data.shift.hora_fin})`;
+
+        document.getElementById("encargado").value = data.assignment.encargado_nombre || "SIN ASIGNAR";
+        document.getElementById("tela").textContent = data.state.codigo_tela;
+        document.getElementById("total").textContent = data.state.total_fajas;
+        document.getElementById("inicio").textContent = data.state.siguiente_faja;
+
+        // Si hay turno abierto: mostramos estado y sugerimos un fajaFin mínimo
+        if (data.openLog) {
+          setStatus("Turno ABIERTO", "text-bg-success");
+          document.getElementById("btnStart").disabled = true;
+          document.getElementById("btnEnd").disabled = false;
+
+          document.getElementById("ayudante").value = data.openLog.ayudante_nombre || "";
+          document.getElementById("fajaFin").min = data.openLog.faja_inicio;
+          document.getElementById("fajaFin").value = data.state.siguiente_faja; // puedes ajustarlo manualmente
+        } else {
+          setStatus("Sin turno abierto", "text-bg-secondary");
+          document.getElementById("btnStart").disabled = false;
+          document.getElementById("btnEnd").disabled = true;
+
+          document.getElementById("fajaFin").min = data.state.siguiente_faja;
+          document.getElementById("fajaFin").value = "";
+        }
+      } catch (e) {
+        setErr(e.message);
+      }
+    }
+
+    document.getElementById("refresh").addEventListener("click", load);
+
+    document.getElementById("btnStart").addEventListener("click", async () => {
+      clearErr();
+      try {
+        const ayudante_nombre = document.getElementById("ayudante").value.trim();
+        await api(`/api/stations/${stationId}/start`, {
+          method: "POST",
+          body: JSON.stringify({ ayudante_nombre })
+        });
+        await load();
+      } catch (e) {
+        setErr(e.message);
+      }
+    });
+
+    document.getElementById("btnEnd").addEventListener("click", async () => {
+      clearErr();
+      try {
+        const ayudante_nombre = document.getElementById("ayudante").value.trim();
+        const faja_fin = Number(document.getElementById("fajaFin").value);
+        const observaciones = document.getElementById("obs").value.trim();
+
+        await api(`/api/stations/${stationId}/end`, {
+          method: "POST",
+          body: JSON.stringify({ faja_fin, ayudante_nombre, observaciones })
+        });
+        await load();
+      } catch (e) {
+        setErr(e.message);
+      }
+    });
+
+    load();
+  </script>
+</body>
+</html>
