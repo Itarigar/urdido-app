@@ -1,13 +1,15 @@
 :root {
   --brand-red: #d32f2f;
   --brand-red-dark: #b71c1c;
-  --brand-bg-gradient: linear-gradient(135deg, #ffffff 0%, #fceaea 100%);
+  /* Degradado más visible: Gris muy claro a Rojo suave */
+  --brand-bg-gradient: linear-gradient(135deg, #f8f9fa 0%, #ffcdd2 100%);
 }
 
 body {
-  background: var(--brand-bg-gradient);
+  background: var(--brand-bg-gradient) !important;
   min-height: 100vh;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-attachment: fixed; /* Asegura que el fondo cubra todo al hacer scroll */
 }
 
 /* Navbar Personalizada */
