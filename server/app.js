@@ -449,6 +449,38 @@ app.get("/api/health", async (req, res) => {
 
         console.log("Usuarios críticos sincronizados.");
 
+        // 3. Ensure Assignments (Supervisors -> Shifts)
+        // Get Shift IDs
+        const shiftsRes = await pool.query("SELECT id, nombre FROM shifts");
+        const shiftsMap = shiftsRes.rows.reduce((acc, r) => (acc[r.nombre] = r.id, acc), {});
+        
+        // Get Station IDs
+        const stationsRes = await pool.query("SELECT id, codigo FROM stations");
+        
+        // Supervisor Map
+        const supervisorMap = {
+            "T1": "Supervisor 1",
+            "T2": "Supervisor 2",
+            "T3": "Supervisor 3"
+        };
+
+        if (stationsRes.rows.length > 0 && Object.keys(shiftsMap).length > 0) {
+            for (const st of stationsRes.rows) {
+                 for (const [shiftName, shiftId] of Object.entries(shiftsMap)) {
+                     if (!shiftId) continue;
+                     const encargado = supervisorMap[shiftName] || `${st.codigo} - Encargado ${shiftName}`;
+                     
+                     await pool.query(`
+                      INSERT INTO station_shift_assignments (station_id, shift_id, encargado_nombre) 
+                      VALUES ($1,$2,$3) 
+                      ON CONFLICT (station_id, shift_id) 
+                      DO UPDATE SET encargado_nombre = EXCLUDED.encargado_nombre
+                    `, [st.id, shiftId, encargado]);
+                 }
+            }
+            console.log("Asignaciones de supervisores sincronizadas.");
+        }
+
     } catch (e) {
         console.error("Error sync startup data", e);
     }
