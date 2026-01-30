@@ -30,9 +30,19 @@ async function seed() {
 
     // 1. Turnos
     console.log("Insertando turnos...");
-    await insertShift("T1", "06:00", "14:00");
-    await insertShift("T2", "14:00", "22:00");
-    await insertShift("T3", "22:00", "06:00");
+    // Usamos ON CONFLICT DO UPDATE para asegurar que los horarios se actualicen si ya existen
+    const insertShift = async (nombre, inicio, fin) => {
+      await client.query(`
+        INSERT INTO shifts (nombre, hora_inicio, hora_fin) 
+        VALUES ($1,$2,$3) 
+        ON CONFLICT (nombre) 
+        DO UPDATE SET hora_inicio = EXCLUDED.hora_inicio, hora_fin = EXCLUDED.hora_fin
+      `, [nombre, inicio, fin]);
+    };
+
+    await insertShift("T1", "07:00", "15:00");
+    await insertShift("T2", "15:00", "23:00");
+    await insertShift("T3", "23:00", "07:00");
 
     // 2. Estaciones
     console.log("Insertando estaciones...");

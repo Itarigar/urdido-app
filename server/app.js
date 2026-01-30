@@ -98,10 +98,7 @@ async function getCurrentShift() {
   `);
   
   if (shiftRes.rows.length > 0) return shiftRes.rows[0];
-
-  // Fallback
-  const fallback = await pool.query("SELECT * FROM shifts ORDER BY id ASC LIMIT 1");
-  return fallback.rows[0];
+  return null;
 }
 
 // Endpoint Dashboard
@@ -367,6 +364,20 @@ app.get("/api/health", async (req, res) => {
   }
 });
 
+// Auto-update shifts on startup (Temporary measure to sync DB)
+(async () => {
+    try {
+        await pool.query(`
+            UPDATE shifts SET hora_inicio = '07:00', hora_fin = '15:00' WHERE nombre = 'T1';
+            UPDATE shifts SET hora_inicio = '15:00', hora_fin = '23:00' WHERE nombre = 'T2';
+            UPDATE shifts SET hora_inicio = '23:00', hora_fin = '07:00' WHERE nombre = 'T3';
+        `);
+        console.log("Horarios de turnos sincronizados.");
+    } catch (e) {
+        console.error("Error sync shifts", e);
+    }
+})();
+
 app.listen(PORT, () => {
-  console.log(`✅ Servidor corriendo en puerto ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
