@@ -40,13 +40,16 @@ async function seed() {
     await insertStation("#6");
     await insertStation("#8");
 
-    // 3. Usuarios
+    // 3. Usuarios (Desde variables de entorno o valores por defecto seguros)
     console.log("Insertando usuarios...");
-    await insertUser("super1", "1234", "Supervisor 1", "SUPERVISOR");
-    await insertUser("super2", "1234", "Supervisor 2", "SUPERVISOR");
-    await insertUser("super3", "1234", "Supervisor 3", "SUPERVISOR");
-    await insertUser("gerente", "1234", "Gerente", "GERENTE");
-    await insertUser("sistemas", "1234", "Sistemas", "SISTEMAS");
+    const adminUser = process.env.SEED_ADMIN_USER || "admin";
+    const adminPass = process.env.SEED_ADMIN_PASSWORD || "admin123";
+    
+    // Solo creamos un usuario administrador inicial si no existe
+    await insertUser(adminUser, adminPass, "Administrador", "SISTEMAS");
+    
+    // Si necesitas más usuarios, agrégalos manualmente en la base de datos o usa variables de entorno
+    // await insertUser("supervisor1", process.env.SUPERVISOR_PASS, "Supervisor 1", "SUPERVISOR");
 
     // 4. Asignaciones (Todos contra todos)
     console.log("Generando asignaciones...");
