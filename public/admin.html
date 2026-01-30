@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Reportes - Urdido</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="style.css?v=5" rel="stylesheet">
+  <!-- SheetJS for Excel export -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+  <!-- jsPDF for PDF export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body>
+  <nav class="navbar navbar-expand-lg navbar-custom">
+    <div class="container">
+      <span class="navbar-brand">
+        <img src="logo.png" alt="Logo" height="30" class="d-inline-block align-text-top me-2" style="background: white; border-radius: 4px; padding: 2px;">
+        Reportes Administrativos
+      </span>
+      <div class="ms-auto">
+        <button class="btn btn-outline-light btn-sm" onclick="logout()">Salir</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container py-4">
+    <div id="err" class="alert alert-danger d-none"></div>
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h3>Historial de Producción</h3>
+      <div class="btn-group">
+        <button class="btn btn-success" onclick="exportExcel()">Descargar Excel</button>
+        <button class="btn btn-danger" onclick="exportPDF()">Descargar PDF</button>
+      </div>
+    </div>
+
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-striped table-hover" id="logsTable">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Turno</th>
+                <th>Estación</th>
+                <th>Supervisor</th>
+                <th>Ayudante</th>
+                <th>Tela</th>
+                <th>Faja Inicio</th>
+                <th>Faja Fin</th>
+                <th>Hora Inicio</th>
+                <th>Hora Fin</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody id="logsBody">
+              <!-- Data will be inserted here -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+  <script>
+    mustAuth();
+
+    // Check role
+    const user = getUser();
+    if (user.rol !== 'GERENTE' && user.rol !== 'SISTEMAS') {
+        window.location.href = '/dashboard.html';
+    }
+
+    let logsData = [];
+
+    async function loadLogs() {
+        try {
+            const data = await api('/api/admin/logs');
+            logsData = data;
+            renderTable(data);
+        } catch (e) {
+            document.getElementById("err").textContent = e.message;
+            document.getElementById("err").classList.remove("d-none");
+        }
+    }
+
+    function formatDate(isoStr) {
+        if (!isoStr) return "";
+        return new Date(isoStr).toLocaleDateString();
+    }
+
+    function formatTime(isoStr) {
+        if (!isoStr) return "";
+        return new Date(isoStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function renderTable(data) {
+        const tbody = document.getElementById("logsBody");
+        tbody.innerHTML = data.map(row => `
+            <tr>
+                <td>${formatDate(row.fecha)}</td>
+                <td>${row.turno}</td>
+                <td>${row.estacion}</td>
+                <td>${row.encargado_nombre}</td>
+                <td>${row.ayudante_nombre || '-'}</td>
+                <td>${row.codigo_tela}</td>
+                <td>${row.faja_inicio}</td>
+                <td>${row.faja_fin || '-'}</td>
+                <td>${formatTime(row.inicio_ts)}</td>
+                <td>${formatTime(row.fin_ts)}</td>
+                <td><span class="badge ${row.status === 'ABIERTO' ? 'text-bg-success' : 'text-bg-secondary'}">${row.status}</span></td>
+            </tr>
+        `).join("");
+    }
+
+    function exportExcel() {
+        const ws = XLSX.utils.json_to_sheet(logsData.map(row => ({
+            Fecha: formatDate(row.fecha),
+            Turno: row.turno,
+            Estacion: row.estacion,
+            Supervisor: row.encargado_nombre,
+            Ayudante: row.ayudante_nombre,
+            Tela: row.codigo_tela,
+            Faja_Inicio: row.faja_inicio,
+            Faja_Fin: row.faja_fin,
+            Inicio: formatTime(row.inicio_ts),
+            Fin: formatTime(row.fin_ts),
+            Observaciones: row.observaciones,
+            Estado: row.status
+        })));
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Reporte");
+        XLSX.writeFile(wb, "Reporte_Urdido.xlsx");
+    }
+
+    function exportPDF() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('l', 'mm', 'a4'); // Landscape
+        
+        doc.text("Reporte de Producción - Urdido", 14, 15);
+        
+        doc.autoTable({
+            head: [['Fecha', 'Turno', 'Est.', 'Supervisor', 'Tela', 'F. Ini', 'F. Fin', 'Inicio', 'Fin']],
+            body: logsData.map(row => [
+                formatDate(row.fecha),
+                row.turno,
+                row.estacion,
+                row.encargado_nombre,
+                row.codigo_tela,
+                row.faja_inicio,
+                row.faja_fin || '-',
+                formatTime(row.inicio_ts),
+                formatTime(row.fin_ts)
+            ]),
+            startY: 20,
+        });
+        
+        doc.save("Reporte_Urdido.pdf");
+    }
+
+    loadLogs();
+  </script>
+</body>
+</html>

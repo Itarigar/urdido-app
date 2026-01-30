@@ -55,13 +55,19 @@ async function seed() {
     const adminUser = process.env.SEED_ADMIN_USER || "admin";
     const adminPass = process.env.SEED_ADMIN_PASSWORD || "admin123";
     
-    // Solo creamos un usuario administrador inicial si no existe
+    // Usuario Sistemas (Administrador)
     await insertUser(adminUser, adminPass, "Administrador", "SISTEMAS");
+
+    // Usuario Gerente
+    await insertUser("gerente", "gerente123", "Gerente de Planta", "GERENTE");
     
-    // Usuarios Supervisores por defecto
-    await insertUser("sup1", "sup1", "Supervisor 1", "SUPERVISOR");
-    await insertUser("sup2", "sup2", "Supervisor 2", "SUPERVISOR");
-    await insertUser("sup3", "sup3", "Supervisor 3", "SUPERVISOR");
+    // Usuarios Supervisores
+    // super1 -> carpe1
+    await insertUser("super1", "carpe1", "Supervisor 1", "SUPERVISOR");
+    // super2 -> carpe2
+    await insertUser("super2", "carpe2", "Supervisor 2", "SUPERVISOR");
+    // super3 -> carpe3
+    await insertUser("super3", "carpe3", "Supervisor 3", "SUPERVISOR");
 
     // 4. Asignaciones (Supervisores específicos por turno)
     console.log("Generando asignaciones...");

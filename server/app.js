@@ -296,7 +296,44 @@ app.post("/api/stations/:id/start", authenticateToken, async (req, res) => {
   }
 });
 
-// END Turno
+// GET Report Logs (Admin/Gerente)
+app.get("/api/admin/logs", authenticateToken, async (req, res) => {
+    try {
+        if (req.user.rol !== 'GERENTE' && req.user.rol !== 'SISTEMAS') {
+            return res.status(403).json({ error: "Acceso no autorizado" });
+        }
+
+        const query = `
+            SELECT 
+                sl.id,
+                sl.fecha,
+                sh.nombre as turno,
+                st.codigo as estacion,
+                sl.encargado_nombre,
+                sl.ayudante_nombre,
+                f.codigo_tela,
+                sl.faja_inicio,
+                sl.faja_fin,
+                sl.inicio_ts,
+                sl.fin_ts,
+                sl.observaciones,
+                sl.status
+            FROM shift_logs sl
+            JOIN shifts sh ON sl.shift_id = sh.id
+            JOIN stations st ON sl.station_id = st.id
+            JOIN fabrics f ON sl.fabric_id = f.id
+            ORDER BY sl.fecha DESC, sl.inicio_ts DESC
+        `;
+
+        const result = await pool.query(query);
+        res.json(result.rows);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// START Turno
 app.post("/api/stations/:id/end", authenticateToken, async (req, res) => {
   try {
     const stationId = req.params.id;

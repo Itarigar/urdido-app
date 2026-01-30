@@ -89,7 +89,13 @@
           body: JSON.stringify({ username, password })
         });
         setToken(data.token);
-        window.location.href = "/dashboard.html";
+        
+        // Redirigir según rol
+        if (data.user.rol === 'GERENTE' || data.user.rol === 'SISTEMAS') {
+            window.location.href = "/admin.html";
+        } else {
+            window.location.href = "/dashboard.html";
+        }
       } catch (e) {
         err.textContent = e.message;
         err.classList.remove("d-none");
