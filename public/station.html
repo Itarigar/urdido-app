@@ -221,8 +221,8 @@
 
     // Init
     (async () => {
-        await loadLists();
-        await load();
+        try { await loadLists(); } catch (e) { console.error("List error:", e); }
+        try { await load(); } catch (e) { console.error("Load error:", e); }
     })();
 
     document.getElementById("btnEnd").addEventListener("click", async () => {
