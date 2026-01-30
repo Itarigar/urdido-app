@@ -13,6 +13,11 @@ const JWT_SECRET = process.env.JWT_SECRET || "secreto_super_seguro_dev";
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "../public")));
 
+// Redirigir raíz a login
+app.get("/", (req, res) => {
+  res.redirect("/login.html");
+});
+
 // Login Endpoint
 app.post("/api/login", async (req, res) => {
   const { username, password } = req.body;
