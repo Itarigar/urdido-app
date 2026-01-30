@@ -415,17 +415,42 @@ app.get("/api/health", async (req, res) => {
   }
 });
 
-// Auto-update shifts on startup (Temporary measure to sync DB)
+// Auto-update shifts and users on startup
 (async () => {
     try {
+        // 1. Sync Shifts
         await pool.query(`
             UPDATE shifts SET hora_inicio = '07:00', hora_fin = '15:00' WHERE nombre = 'T1';
             UPDATE shifts SET hora_inicio = '15:00', hora_fin = '23:00' WHERE nombre = 'T2';
             UPDATE shifts SET hora_inicio = '23:00', hora_fin = '07:00' WHERE nombre = 'T3';
         `);
         console.log("Horarios de turnos sincronizados.");
+
+        // 2. Ensure Users Exist (Supervisors & Gerente)
+        // Helper to upsert user
+        const upsertUser = async (username, password, name, role) => {
+            const hash = await bcrypt.hash(password, 10);
+            await pool.query(`
+                INSERT INTO users (username, password_hash, nombre, rol)
+                VALUES ($1, $2, $3, $4)
+                ON CONFLICT (username) 
+                DO UPDATE SET password_hash = $2, nombre = $3, rol = $4
+            `, [username, hash, name, role]);
+        };
+
+        await upsertUser('super1', 'carpe1', 'Supervisor 1', 'SUPERVISOR');
+        await upsertUser('super2', 'carpe2', 'Supervisor 2', 'SUPERVISOR');
+        await upsertUser('super3', 'carpe3', 'Supervisor 3', 'SUPERVISOR');
+        await upsertUser('gerente', 'gerente123', 'Gerente de Planta', 'GERENTE');
+        // Admin backup
+        const adminUser = process.env.SEED_ADMIN_USER || "admin";
+        const adminPass = process.env.SEED_ADMIN_PASSWORD || "admin123";
+        await upsertUser(adminUser, adminPass, 'Administrador', 'SISTEMAS');
+
+        console.log("Usuarios críticos sincronizados.");
+
     } catch (e) {
-        console.error("Error sync shifts", e);
+        console.error("Error sync startup data", e);
     }
 })();
 
