@@ -1,19 +1,17 @@
-PRAGMA foreign_keys = ON;
-
 CREATE TABLE IF NOT EXISTS stations (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id SERIAL PRIMARY KEY,
   codigo TEXT NOT NULL UNIQUE
 );
 
 CREATE TABLE IF NOT EXISTS shifts (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id SERIAL PRIMARY KEY,
   nombre TEXT NOT NULL UNIQUE,
-  hora_inicio TEXT NOT NULL, -- "06:00"
-  hora_fin TEXT NOT NULL     -- "14:00"
+  hora_inicio TEXT NOT NULL,
+  hora_fin TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS users (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id SERIAL PRIMARY KEY,
   username TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,
   nombre TEXT NOT NULL,
@@ -22,59 +20,49 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 CREATE TABLE IF NOT EXISTS station_shift_assignments (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  station_id INTEGER NOT NULL,
-  shift_id INTEGER NOT NULL,
+  id SERIAL PRIMARY KEY,
+  station_id INTEGER NOT NULL REFERENCES stations(id),
+  shift_id INTEGER NOT NULL REFERENCES shifts(id),
   encargado_nombre TEXT NOT NULL,
   activo INTEGER NOT NULL DEFAULT 1,
-  FOREIGN KEY (station_id) REFERENCES stations(id),
-  FOREIGN KEY (shift_id) REFERENCES shifts(id),
   UNIQUE (station_id, shift_id)
 );
 
 CREATE TABLE IF NOT EXISTS fabrics (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id SERIAL PRIMARY KEY,
   codigo_tela TEXT NOT NULL UNIQUE,
   descripcion TEXT,
   total_fajas INTEGER NOT NULL CHECK (total_fajas > 0)
 );
 
 CREATE TABLE IF NOT EXISTS station_queue (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  station_id INTEGER NOT NULL,
-  fabric_id INTEGER NOT NULL,
+  id SERIAL PRIMARY KEY,
+  station_id INTEGER NOT NULL REFERENCES stations(id),
+  fabric_id INTEGER NOT NULL REFERENCES fabrics(id),
   orden INTEGER NOT NULL,
-  activa INTEGER NOT NULL DEFAULT 1,
-  FOREIGN KEY (station_id) REFERENCES stations(id),
-  FOREIGN KEY (fabric_id) REFERENCES fabrics(id)
+  activa INTEGER NOT NULL DEFAULT 1
 );
 
 CREATE TABLE IF NOT EXISTS station_state (
-  station_id INTEGER PRIMARY KEY,
-  fabric_id_actual INTEGER,
+  station_id INTEGER PRIMARY KEY REFERENCES stations(id),
+  fabric_id_actual INTEGER REFERENCES fabrics(id),
   siguiente_faja INTEGER,
-  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-  FOREIGN KEY (station_id) REFERENCES stations(id),
-  FOREIGN KEY (fabric_id_actual) REFERENCES fabrics(id)
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS shift_logs (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  fecha TEXT NOT NULL,          -- "YYYY-MM-DD"
-  shift_id INTEGER NOT NULL,
-  station_id INTEGER NOT NULL,
+  id SERIAL PRIMARY KEY,
+  fecha TEXT NOT NULL,
+  shift_id INTEGER NOT NULL REFERENCES shifts(id),
+  station_id INTEGER NOT NULL REFERENCES stations(id),
   encargado_nombre TEXT NOT NULL,
   ayudante_nombre TEXT,
-  fabric_id INTEGER NOT NULL,
+  fabric_id INTEGER NOT NULL REFERENCES fabrics(id),
   faja_inicio INTEGER NOT NULL,
   faja_fin INTEGER,
-  inicio_ts TEXT NOT NULL DEFAULT (datetime('now')),
-  fin_ts TEXT,
+  inicio_ts TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  fin_ts TIMESTAMP,
   observaciones TEXT,
   status TEXT NOT NULL CHECK (status IN ('ABIERTO','CERRADO')),
-  created_by_user_id INTEGER NOT NULL,
-  FOREIGN KEY (shift_id) REFERENCES shifts(id),
-  FOREIGN KEY (station_id) REFERENCES stations(id),
-  FOREIGN KEY (fabric_id) REFERENCES fabrics(id),
-  FOREIGN KEY (created_by_user_id) REFERENCES users(id)
+  created_by_user_id INTEGER NOT NULL REFERENCES users(id)
 );
