@@ -332,15 +332,29 @@ app.post("/api/stations/:id/end", authenticateToken, async (req, res) => {
         WHERE id = $4
       `, [faja_fin, ayudante_nombre, observaciones, openLog.id]);
 
+      // Check if fabric is completed
+      // 1. Get total_fajas for current fabric
+      const fabricRes = await client.query("SELECT total_fajas FROM fabrics WHERE id = $1", [openLog.fabric_id]);
+      const totalFajas = fabricRes.rows[0] ? fabricRes.rows[0].total_fajas : 999999;
+
+      let nextFaja = faja_fin + 1;
+      let fabricIdActual = openLog.fabric_id;
+
+      // Logic: If we finished the last faja (or more), reset the station for next fabric
+      if (faja_fin >= totalFajas) {
+          nextFaja = 1; // Reset faja counter
+          fabricIdActual = null; // Clear fabric assignment
+      }
+
       // Update Station State
       await client.query(`
         UPDATE station_state 
-        SET siguiente_faja = $1 
-        WHERE station_id = $2
-      `, [faja_fin + 1, stationId]);
+        SET siguiente_faja = $1, fabric_id_actual = $2
+        WHERE station_id = $3
+      `, [nextFaja, fabricIdActual, stationId]);
 
       await client.query("COMMIT");
-      res.json({ ok: true });
+      res.json({ ok: true, completed: faja_fin >= totalFajas });
     } catch (e) {
       await client.query("ROLLBACK");
       throw e;

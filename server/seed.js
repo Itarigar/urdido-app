@@ -58,21 +58,35 @@ async function seed() {
     // Solo creamos un usuario administrador inicial si no existe
     await insertUser(adminUser, adminPass, "Administrador", "SISTEMAS");
     
-    // Si necesitas más usuarios, agrégalos manualmente en la base de datos o usa variables de entorno
-    // await insertUser("supervisor1", process.env.SUPERVISOR_PASS, "Supervisor 1", "SUPERVISOR");
+    // Usuarios Supervisores por defecto
+    await insertUser("sup1", "sup1", "Supervisor 1", "SUPERVISOR");
+    await insertUser("sup2", "sup2", "Supervisor 2", "SUPERVISOR");
+    await insertUser("sup3", "sup3", "Supervisor 3", "SUPERVISOR");
 
-    // 4. Asignaciones (Todos contra todos)
+    // 4. Asignaciones (Supervisores específicos por turno)
     console.log("Generando asignaciones...");
     const { rows: stations } = await client.query("SELECT id, codigo FROM stations");
     const { rows: shifts } = await client.query("SELECT id, nombre FROM shifts");
+    
+    // Mapa de supervisores por nombre de turno
+    const supervisorMap = {
+        "T1": "Supervisor 1",
+        "T2": "Supervisor 2",
+        "T3": "Supervisor 3"
+    };
 
     for (const st of stations) {
       for (const sh of shifts) {
-        const encargado = `${st.codigo} - Encargado ${sh.nombre}`;
-        await client.query(
-          "INSERT INTO station_shift_assignments (station_id, shift_id, encargado_nombre) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING",
-          [st.id, sh.id, encargado]
-        );
+        // Asignar el supervisor correspondiente al turno, o un genérico si no coincide
+        const encargado = supervisorMap[sh.nombre] || `${st.codigo} - Encargado ${sh.nombre}`;
+        
+        // Usamos UPSERT para actualizar si ya existe (para corregir asignaciones antiguas)
+        await client.query(`
+          INSERT INTO station_shift_assignments (station_id, shift_id, encargado_nombre) 
+          VALUES ($1,$2,$3) 
+          ON CONFLICT (station_id, shift_id) 
+          DO UPDATE SET encargado_nombre = EXCLUDED.encargado_nombre
+        `, [st.id, sh.id, encargado]);
       }
     }
 
