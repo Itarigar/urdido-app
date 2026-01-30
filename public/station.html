@@ -110,6 +110,35 @@
       b.className = "badge " + kind;
     }
 
+    let fabricsMap = {};
+
+    async function loadLists() {
+      try {
+        const [staff, fabrics] = await Promise.all([
+            api("/api/staff"),
+            api("/api/fabrics")
+        ]);
+
+        // Staff Datalist
+        const dl = document.getElementById("staffList");
+        dl.innerHTML = staff.map(n => `<option value="${n}">`).join("");
+
+        // Fabrics Select
+        const sel = document.getElementById("telaSelect");
+        sel.innerHTML = fabrics.map(f => `<option value="${f.id}">${f.codigo_tela}</option>`).join("");
+        
+        fabrics.forEach(f => fabricsMap[f.id] = f);
+        
+        sel.addEventListener("change", () => {
+            const f = fabricsMap[sel.value];
+            if (f) document.getElementById("total").textContent = f.total_fajas;
+        });
+
+      } catch (e) {
+        console.error("Error loading lists", e);
+      }
+    }
+
     async function load() {
       clearErr();
       try {
@@ -118,24 +147,44 @@
         document.getElementById("title").textContent = `Estación ${data.station.codigo}`;
         document.getElementById("turno").textContent = `Turno: ${data.shift.nombre} (${data.shift.hora_inicio}–${data.shift.hora_fin})`;
 
-        document.getElementById("encargado").value = data.assignment.encargado_nombre || "SIN ASIGNAR";
-        document.getElementById("tela").textContent = data.state.codigo_tela;
-        document.getElementById("total").textContent = data.state.total_fajas;
+        // Default Encargado logic
+        const assignedEncargado = data.assignment.encargado_nombre || "SIN ASIGNAR";
+        
+        // Tela Logic
+        const sel = document.getElementById("telaSelect");
+        if (data.state.fabric_id_actual) {
+            sel.value = data.state.fabric_id_actual;
+            if (fabricsMap[data.state.fabric_id_actual]) {
+                 document.getElementById("total").textContent = fabricsMap[data.state.fabric_id_actual].total_fajas;
+            }
+        }
+        
         document.getElementById("inicio").textContent = data.state.siguiente_faja;
 
-        // Si hay turno abierto: mostramos estado y sugerimos un fajaFin mínimo
+        // Si hay turno abierto: mostramos estado y bloqueamos inputs de inicio
         if (data.openLog) {
           setStatus("Turno ABIERTO", "text-bg-success");
           document.getElementById("btnStart").disabled = true;
           document.getElementById("btnEnd").disabled = false;
-
+          
+          // Bloquear campos de configuración
+          document.getElementById("encargado").value = data.openLog.encargado_nombre;
+          document.getElementById("encargado").disabled = true;
+          document.getElementById("telaSelect").value = data.openLog.fabric_id;
+          document.getElementById("telaSelect").disabled = true;
+          
           document.getElementById("ayudante").value = data.openLog.ayudante_nombre || "";
           document.getElementById("fajaFin").min = data.openLog.faja_inicio;
-          document.getElementById("fajaFin").value = data.state.siguiente_faja; // puedes ajustarlo manualmente
+          document.getElementById("fajaFin").value = data.state.siguiente_faja; 
         } else {
           setStatus("Sin turno abierto", "text-bg-secondary");
           document.getElementById("btnStart").disabled = false;
           document.getElementById("btnEnd").disabled = true;
+
+          // Habilitar campos
+          document.getElementById("encargado").disabled = false;
+          document.getElementById("encargado").value = assignedEncargado;
+          document.getElementById("telaSelect").disabled = false;
 
           document.getElementById("fajaFin").min = data.state.siguiente_faja;
           document.getElementById("fajaFin").value = "";
@@ -151,11 +200,24 @@
       clearErr();
       try {
         const ayudante_nombre = document.getElementById("ayudante").value.trim();
+        const encargado_nombre = document.getElementById("encargado").value.trim();
+        const fabric_id = document.getElementById("telaSelect").value;
+        
         await api(`/api/stations/${stationId}/start`, {
           method: "POST",
-          body: JSON.stringify({ ayudante_nombre })
+          body: JSON.stringify({ ayudante_nombre, encargado_nombre, fabric_id })
         });
         await load();
+      } catch (e) {
+        setErr(e.message);
+      }
+    });
+
+    // Init
+    (async () => {
+        await loadLists();
+        await load();
+    })();
       } catch (e) {
         setErr(e.message);
       }

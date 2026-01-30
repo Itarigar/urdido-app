@@ -194,11 +194,42 @@ app.get("/api/stations/:id", authenticateToken, async (req, res) => {
   }
 });
 
+// GET Fabrics List
+app.get("/api/fabrics", authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM fabrics ORDER BY codigo_tela ASC");
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET Staff List (Encargados/Ayudantes history)
+app.get("/api/staff", authenticateToken, async (req, res) => {
+  try {
+    // Combine names from assignments and logs to get a list of known staff
+    const result = await pool.query(`
+      SELECT DISTINCT nombre FROM (
+        SELECT encargado_nombre as nombre FROM station_shift_assignments
+        UNION
+        SELECT encargado_nombre as nombre FROM shift_logs
+        UNION
+        SELECT ayudante_nombre as nombre FROM shift_logs WHERE ayudante_nombre IS NOT NULL
+      ) as t
+      WHERE nombre IS NOT NULL AND nombre != ''
+      ORDER BY nombre ASC
+    `);
+    res.json(result.rows.map(r => r.nombre));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // START Turno
 app.post("/api/stations/:id/start", authenticateToken, async (req, res) => {
   try {
     const stationId = req.params.id;
-    const { ayudante_nombre } = req.body;
+    const { ayudante_nombre, encargado_nombre, fabric_id } = req.body;
     const currentShift = await getCurrentShift();
     if (!currentShift) return res.status(404).json({ error: "No hay turno activo" });
 
@@ -212,19 +243,39 @@ app.post("/api/stations/:id/start", authenticateToken, async (req, res) => {
       return res.status(400).json({ error: "Ya hay un turno abierto para esta estación" });
     }
 
-    // Get current state
-    const stateRes = await pool.query("SELECT * FROM station_state WHERE station_id = $1", [stationId]);
-    const state = stateRes.rows[0];
-    if (!state || !state.fabric_id_actual) {
-      return res.status(400).json({ error: "No hay tela asignada a esta estación" });
+    // Determine Encargado
+    let finalEncargado = encargado_nombre;
+    if (!finalEncargado) {
+        // Fallback to assignment
+        const assignRes = await pool.query(
+          "SELECT * FROM station_shift_assignments WHERE station_id = $1 AND shift_id = $2",
+          [stationId, currentShift.id]
+        );
+        finalEncargado = assignRes.rows[0] ? assignRes.rows[0].encargado_nombre : "DESCONOCIDO";
     }
 
-    // Get assignment for encargado name
-    const assignRes = await pool.query(
-      "SELECT * FROM station_shift_assignments WHERE station_id = $1 AND shift_id = $2",
-      [stationId, currentShift.id]
-    );
-    const encargado = assignRes.rows[0] ? assignRes.rows[0].encargado_nombre : "DESCONOCIDO";
+    // Determine Fabric
+    let finalFabricId = fabric_id;
+    if (!finalFabricId) {
+        // Fallback to current state
+        const stateRes = await pool.query("SELECT * FROM station_state WHERE station_id = $1", [stationId]);
+        const state = stateRes.rows[0];
+        if (!state || !state.fabric_id_actual) {
+            return res.status(400).json({ error: "No hay tela asignada y no se proporcionó una" });
+        }
+        finalFabricId = state.fabric_id_actual;
+    } else {
+        // If fabric changed, we might need to update station_state or just use it for this log?
+        // Usually, changing fabric implies updating the station state.
+        // Let's update the station state fabric if it's different.
+        await pool.query("UPDATE station_state SET fabric_id_actual = $1 WHERE station_id = $2", [finalFabricId, stationId]);
+    }
+    
+    // Get Faja Start (from state, after potential fabric update? 
+    // If fabric changed, maybe faja should reset? 
+    // For now, let's assume faja continues from station_state.siguiente_faja
+    const stateRes = await pool.query("SELECT * FROM station_state WHERE station_id = $1", [stationId]);
+    const state = stateRes.rows[0];
 
     // Insert Log
     await pool.query(`
@@ -234,9 +285,9 @@ app.post("/api/stations/:id/start", authenticateToken, async (req, res) => {
     `, [
       currentShift.id, 
       stationId, 
-      encargado, 
+      finalEncargado, 
       ayudante_nombre, 
-      state.fabric_id_actual, 
+      finalFabricId, 
       state.siguiente_faja,
       req.user.id
     ]);
