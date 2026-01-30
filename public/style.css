@@ -1,0 +1,77 @@
+:root {
+  --brand-red: #d32f2f;
+  --brand-red-dark: #b71c1c;
+  --brand-bg-gradient: linear-gradient(135deg, #ffffff 0%, #fceaea 100%);
+}
+
+body {
+  background: var(--brand-bg-gradient);
+  min-height: 100vh;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* Navbar Personalizada */
+.navbar-custom {
+  background-color: var(--brand-red);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.navbar-custom .navbar-brand {
+  color: white;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+}
+
+.navbar-custom .btn-outline-light {
+  color: white;
+  border-color: rgba(255,255,255,0.8);
+}
+
+.navbar-custom .btn-outline-light:hover {
+  background-color: white;
+  color: var(--brand-red);
+}
+
+/* Enlaces de navegación */
+.navbar-custom a.navbar-brand:hover {
+  color: #f0f0f0;
+}
+
+/* Botones Principales */
+.btn-brand {
+  background-color: var(--brand-red);
+  border-color: var(--brand-red);
+  color: white;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.btn-brand:hover {
+  background-color: var(--brand-red-dark);
+  border-color: var(--brand-red-dark);
+  color: white;
+}
+
+.btn-outline-brand {
+  color: var(--brand-red);
+  border-color: var(--brand-red);
+}
+
+.btn-outline-brand:hover {
+  background-color: var(--brand-red);
+  color: white;
+}
+
+/* Tarjetas */
+.card {
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  transition: transform 0.2s;
+}
+
+/* Inputs */
+.form-control:focus {
+  border-color: var(--brand-red);
+  box-shadow: 0 0 0 0.25rem rgba(211, 47, 47, 0.25);
+}
