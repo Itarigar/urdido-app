@@ -11,6 +11,13 @@ const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || "secreto_super_seguro_dev";
 
 app.use(express.json());
+
+// Deshabilitar caché para evitar problemas de visualización durante desarrollo
+app.use((req, res, next) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  next();
+});
+
 app.use(express.static(path.join(__dirname, "../public")));
 
 // Redirigir raíz a login
