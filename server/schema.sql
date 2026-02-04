@@ -28,7 +28,8 @@ CREATE TABLE users (
   password_hash TEXT NOT NULL,
   nombre TEXT NOT NULL,
   rol TEXT NOT NULL CHECK (rol IN ('SUPERVISOR','GERENTE','SISTEMAS')),
-  activo INTEGER NOT NULL DEFAULT 1 -- 1: Activo, 0: Inactivo
+  activo INTEGER NOT NULL DEFAULT 1, -- 1: Activo, 0: Inactivo
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE station_shift_assignments (
@@ -44,6 +45,8 @@ CREATE TABLE fabrics (
   id SERIAL PRIMARY KEY,
   codigo_tela TEXT NOT NULL UNIQUE,
   descripcion TEXT,
+  familia TEXT CHECK (familia IN ('COBERTORES', 'JERGAS')),
+  tipo TEXT,
   total_fajas INTEGER NOT NULL CHECK (total_fajas > 0)
 );
 
@@ -59,6 +62,7 @@ CREATE TABLE station_state (
   station_id INTEGER PRIMARY KEY REFERENCES stations(id) ON DELETE CASCADE,
   fabric_id_actual INTEGER REFERENCES fabrics(id) ON DELETE SET NULL,
   siguiente_faja INTEGER NOT NULL DEFAULT 1,
+  julio_actual INTEGER,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -69,12 +73,15 @@ CREATE TABLE shift_logs (
   station_id INTEGER NOT NULL REFERENCES stations(id),
   encargado_nombre TEXT NOT NULL,
   ayudante_nombre TEXT,
+  operador_nombre TEXT,
   fabric_id INTEGER NOT NULL REFERENCES fabrics(id),
   faja_inicio INTEGER NOT NULL,
   faja_fin INTEGER,
+  julio INTEGER,
   inicio_ts TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   fin_ts TIMESTAMP,
   observaciones TEXT,
+  estado_urdido TEXT,
   status TEXT NOT NULL CHECK (status IN ('ABIERTO','CERRADO')),
   created_by_user_id INTEGER NOT NULL REFERENCES users(id)
 );

@@ -20,12 +20,15 @@ async function seed() {
     const insertStation = async (codigo) => {
       await client.query("INSERT INTO stations (codigo) VALUES ($1) ON CONFLICT (codigo) DO NOTHING", [codigo]);
     };
-    const insertShift = async (nombre, inicio, fin) => {
-      await client.query("INSERT INTO shifts (nombre, hora_inicio, hora_fin) VALUES ($1,$2,$3) ON CONFLICT (nombre) DO NOTHING", [nombre, inicio, fin]);
-    };
+
     const insertUser = async (username, password, nombre, rol) => {
       const password_hash = bcrypt.hashSync(password, 10);
-      await client.query("INSERT INTO users (username, password_hash, nombre, rol) VALUES ($1,$2,$3,$4) ON CONFLICT (username) DO NOTHING", [username, password_hash, nombre, rol]);
+      await client.query(`
+        INSERT INTO users (username, password_hash, nombre, rol) 
+        VALUES ($1,$2,$3,$4) 
+        ON CONFLICT (username) 
+        DO UPDATE SET password_hash = $2, nombre = $3, rol = $4
+      `, [username, password_hash, nombre, rol]);
     };
 
     // 1. Turnos
@@ -98,9 +101,21 @@ async function seed() {
 
     // 5. Telas
     console.log("Insertando telas...");
-    await client.query("INSERT INTO fabrics (codigo_tela, descripcion, total_fajas) VALUES ($1,$2,$3) ON CONFLICT (codigo_tela) DO NOTHING", ["T-100", "Tela ejemplo 100", 80]);
-    await client.query("INSERT INTO fabrics (codigo_tela, descripcion, total_fajas) VALUES ($1,$2,$3) ON CONFLICT (codigo_tela) DO NOTHING", ["T-200", "Tela ejemplo 200", 60]);
-    await client.query("INSERT INTO fabrics (codigo_tela, descripcion, total_fajas) VALUES ($1,$2,$3) ON CONFLICT (codigo_tela) DO NOTHING", ["T-300", "Tela ejemplo 300", 100]);
+    // Update or Insert fabrics with correct columns (familia, tipo)
+    // Note: seed fabrics might be placeholders. We'll assign them valid families.
+    
+    const insertFabric = async (codigo, desc, familia, tipo, fajas) => {
+         await client.query(`
+            INSERT INTO fabrics (codigo_tela, descripcion, familia, tipo, total_fajas) 
+            VALUES ($1, $2, $3, $4, $5) 
+            ON CONFLICT (codigo_tela) 
+            DO UPDATE SET total_fajas = $5, familia = $3, tipo = $4
+         `, [codigo, desc, familia, tipo, fajas]);
+    };
+
+    await insertFabric("COBERTORES - T100", "Tela ejemplo 100", "COBERTORES", "T100", 80);
+    await insertFabric("JERGAS - T200", "Tela ejemplo 200", "JERGAS", "T200", 60);
+    await insertFabric("COBERTORES - T300", "Tela ejemplo 300", "COBERTORES", "T300", 100);
 
     // Obtener IDs de telas
     const { rows: fabrics } = await client.query("SELECT id, codigo_tela FROM fabrics");
@@ -114,9 +129,9 @@ async function seed() {
       // Para simplificar: borramos cola anterior de estas estaciones.
       await client.query("DELETE FROM station_queue WHERE station_id = $1", [st.id]);
       
-      await client.query("INSERT INTO station_queue (station_id, fabric_id, orden) VALUES ($1,$2,$3)", [st.id, fabricMap["T-100"], 1]);
-      await client.query("INSERT INTO station_queue (station_id, fabric_id, orden) VALUES ($1,$2,$3)", [st.id, fabricMap["T-200"], 2]);
-      await client.query("INSERT INTO station_queue (station_id, fabric_id, orden) VALUES ($1,$2,$3)", [st.id, fabricMap["T-300"], 3]);
+      if (fabricMap["COBERTORES - T100"]) await client.query("INSERT INTO station_queue (station_id, fabric_id, orden) VALUES ($1,$2,$3)", [st.id, fabricMap["COBERTORES - T100"], 1]);
+      if (fabricMap["JERGAS - T200"]) await client.query("INSERT INTO station_queue (station_id, fabric_id, orden) VALUES ($1,$2,$3)", [st.id, fabricMap["JERGAS - T200"], 2]);
+      if (fabricMap["COBERTORES - T300"]) await client.query("INSERT INTO station_queue (station_id, fabric_id, orden) VALUES ($1,$2,$3)", [st.id, fabricMap["COBERTORES - T300"], 3]);
     }
 
     // 7. Estado inicial (station_state)

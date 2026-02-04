@@ -11,7 +11,8 @@
   <nav class="navbar navbar-expand-lg navbar-custom">
     <div class="container">
       <a class="navbar-brand" href="/dashboard.html">← Dashboard</a>
-      <div class="ms-auto">
+      <div class="ms-auto d-flex align-items-center">
+        <span id="navbar-clock" class="text-white me-3 fw-bold small"></span>
         <button class="btn btn-outline-light btn-sm" onclick="logout()">Salir</button>
       </div>
     </div>
@@ -40,8 +41,13 @@
             </div>
 
             <div class="mb-2">
+              <label class="form-label">Operador</label>
+              <input id="operador" class="form-control" list="staffList" placeholder="Escriba o seleccione..." autocomplete="off" />
+            </div>
+
+            <div class="mb-2">
               <label class="form-label">Ayudante</label>
-              <input id="ayudante" class="form-control" placeholder="Nombre del ayudante" list="staffList" />
+              <input id="ayudante" class="form-control" list="staffList" placeholder="Escriba o seleccione..." autocomplete="off" />
             </div>
 
             <datalist id="staffList"></datalist>
@@ -60,20 +66,47 @@
 
             <div class="mb-2">
                 <label class="form-label fw-bold">Tela actual</label>
-                <select id="telaSelect" class="form-select"></select>
+                <div class="input-group">
+                    <select id="telaSelect" class="form-select"></select>
+                    <button class="btn btn-outline-secondary" type="button" id="btnEditTela" title="Agregar/Editar Tela">
+                        ✏️
+                    </button>
+                </div>
             </div>
             
-            <div class="mb-2">Total fajas: <strong id="total"></strong></div>
-            <div class="mb-3">Faja siguiente (inicio): <strong id="inicio"></strong></div>
-
             <div class="mb-2">
-              <label class="form-label">Faja final urdida (al terminar)</label>
-              <input id="fajaFin" type="number" class="form-control" min="1" />
+              <label class="form-label">Julio (Número)</label>
+              <input id="julioInput" type="number" class="form-control" placeholder="Requerido para desbloquear" />
             </div>
 
-            <div class="mb-2">
-              <label class="form-label">Observaciones</label>
-              <textarea id="obs" class="form-control" rows="3"></textarea>
+            <div class="mb-2">Total fajas: <strong id="total"></strong></div>
+            
+            <div class="mb-3">
+              <label class="form-label">Faja inicio</label>
+              <input id="fajaInicioInput" type="number" class="form-control" readonly />
+            </div>
+
+            <div id="endShiftFields" class="d-none">
+              <div class="mb-2">
+                <label class="form-label">Fajas Realizadas (Cantidad)</label>
+                <input id="fajaFin" type="number" class="form-control" placeholder="Ej. 3 (fajas hechas este turno)" />
+              </div>
+
+              <div class="mb-3">
+                  <label class="form-label fw-bold">Estado de Urdido (Finalizar)</label>
+                  <select id="estadoUrdido" class="form-select">
+                      <option value="" selected disabled>Seleccione estado...</option>
+                      <option value="cambio de bobina">Cambio de Bobina</option>
+                      <option value="urdir">Urdir</option>
+                      <option value="urdido completo">Urdido Completo</option>
+                      <option value="plege de tela">Plege de Tela</option>
+                  </select>
+              </div>
+
+              <div class="mb-2">
+                <label class="form-label">Observaciones</label>
+                <textarea id="obs" class="form-control" rows="3"></textarea>
+              </div>
             </div>
 
             <div class="d-flex gap-2 mt-3">
@@ -83,6 +116,7 @@
 
             <div class="mt-3">
               <span class="badge text-bg-secondary" id="statusBadge">Sin estado</span>
+              <div id="startTimeDisplay" class="mt-2 fw-bold text-primary" style="font-size: 0.9rem;"></div>
             </div>
           </div>
         </div>
@@ -91,10 +125,52 @@
 
   </div>
 
+  <!-- Modal Tela -->
+  <div class="modal fade" id="fabricModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Gestionar Tela</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <form id="fabricForm">
+            <div class="mb-3">
+              <label for="modalFamilia" class="form-label">Familia</label>
+              <select class="form-select" id="modalFamilia" required>
+                  <option value="" disabled selected>Seleccione...</option>
+                  <option value="COBERTORES">Cobertores</option>
+                  <option value="JERGAS">Jergas</option>
+              </select>
+            </div>
+            <div class="mb-3">
+              <label for="modalTipo" class="form-label">Tipo / Nombre</label>
+              <input type="text" class="form-control" id="modalTipo" required placeholder="Ej. Parisina">
+            </div>
+            <div class="mb-3">
+              <label for="modalFajas" class="form-label">Total de Fajas</label>
+              <input type="number" class="form-control" id="modalFajas" required min="1">
+            </div>
+            <div class="alert alert-info py-2" style="font-size: 0.9em;">
+                Se generará el código: <strong>FAMILIA - TIPO</strong>
+            </div>
+            <div id="modalErr" class="alert alert-danger d-none"></div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-primary" id="btnSaveFabric">Guardar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="/app.js"></script>
   <script>
     mustAuth();
     const stationId = Number(qs("id"));
+    let fabricModal; // Bootstrap modal instance
 
     if (!stationId) window.location.href = "/dashboard.html";
 
@@ -110,6 +186,12 @@
       err.classList.add("d-none");
     }
 
+    function validateName(name) {
+        if (!name) return false;
+        const parts = name.trim().split(/\s+/);
+        return parts.length >= 2;
+    }
+
     function setStatus(text, kind) {
       const b = document.getElementById("statusBadge");
       b.textContent = text;
@@ -118,27 +200,41 @@
 
     let fabricsMap = {};
 
-    async function loadLists() {
+    async function loadLists(shiftId = null) {
       try {
+        const urlStaff = shiftId ? `/api/staff?shift_id=${shiftId}` : "/api/staff";
         const [staff, fabrics] = await Promise.all([
-            api("/api/staff"),
+            api(urlStaff),
             api("/api/fabrics")
         ]);
 
         // Staff Datalist
         const dl = document.getElementById("staffList");
-        dl.innerHTML = staff.map(n => `<option value="${n}">`).join("");
+        if (dl) {
+            dl.innerHTML = staff.map(n => `<option value="${n}">`).join("");
+        }
 
         // Fabrics Select
         const sel = document.getElementById("telaSelect");
-        sel.innerHTML = fabrics.map(f => `<option value="${f.id}">${f.codigo_tela}</option>`).join("");
-        
-        fabrics.forEach(f => fabricsMap[f.id] = f);
-        
-        sel.addEventListener("change", () => {
-            const f = fabricsMap[sel.value];
-            if (f) document.getElementById("total").textContent = f.total_fajas;
-        });
+        if (sel) {
+            // Save current selection if any
+            const currentVal = sel.value;
+            
+            sel.innerHTML = fabrics.map(f => `<option value="${f.id}">${f.codigo_tela}</option>`).join("");
+            
+            fabrics.forEach(f => fabricsMap[f.id] = f);
+            
+            if (currentVal && fabricsMap[currentVal]) {
+                sel.value = currentVal;
+            }
+
+            sel.addEventListener("change", () => {
+                const f = fabricsMap[sel.value];
+                if (f) document.getElementById("total").textContent = f.total_fajas;
+            });
+            // Trigger change to update total
+            if (sel.value) sel.dispatchEvent(new Event('change'));
+        }
 
       } catch (e) {
         console.error("Error loading lists", e);
@@ -146,12 +242,29 @@
     }
 
     async function load() {
-      clearErr();
+      const btnRefresh = document.getElementById("refresh");
+      const originalText = btnRefresh.innerHTML;
+      
       try {
+        // UI Loading State
+        btnRefresh.disabled = true;
+        btnRefresh.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Cargando...`;
+        clearErr();
+
         const data = await api(`/api/stations/${stationId}`);
 
         document.getElementById("title").textContent = `Estación ${data.station.codigo}`;
         document.getElementById("turno").textContent = `Turno: ${data.shift.nombre} (${data.shift.hora_inicio}–${data.shift.hora_fin})`;
+        
+        // Show update time
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString();
+        // Create or update a small badge next to refresh button if not exists, or just use a toast?
+        // Let's just update a "Last updated" span if we want, but for now the button animation is good feedback.
+        // We can revert the button text to "Actualizado!" briefly?
+        
+        // Reload lists with shift context
+        await loadLists(data.shift.id);
 
         // Default Encargado logic
         const assignedEncargado = data.assignment.encargado_nombre || "SIN ASIGNAR";
@@ -165,84 +278,283 @@
             }
         }
         
-        document.getElementById("inicio").textContent = data.state.siguiente_faja;
+        // Julio Logic
+        const julioInput = document.getElementById("julioInput");
+        if (julioInput) {
+             if (data.state.julio_actual) {
+                 julioInput.value = data.state.julio_actual;
+             }
+        }
+        
+        // Faja Inicio
+        const fajaInicioInput = document.getElementById("fajaInicioInput");
+        if (fajaInicioInput) {
+             // Visual adjustment: If 1, show 0 (New Fabric concept)
+             const val = data.state.siguiente_faja;
+             fajaInicioInput.value = (val === 1) ? 0 : val;
+        }
 
         // Si hay turno abierto: mostramos estado y bloqueamos inputs de inicio
         if (data.openLog) {
           setStatus("Turno ABIERTO", "text-bg-success");
+          
+          if (data.openLog.inicio_ts) {
+              const startDate = new Date(data.openLog.inicio_ts);
+              const dateStr = startDate.toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+              const timeStr = startDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+              document.getElementById("startTimeDisplay").textContent = `Inicio: ${dateStr} - ${timeStr}`;
+          }
+
           document.getElementById("btnStart").disabled = true;
           document.getElementById("btnEnd").disabled = false;
+          
+          // Mostrar campos de fin de turno
+          document.getElementById("endShiftFields").classList.remove("d-none");
           
           // Bloquear campos de configuración
           document.getElementById("encargado").value = data.openLog.encargado_nombre;
           document.getElementById("encargado").disabled = true;
           document.getElementById("telaSelect").value = data.openLog.fabric_id;
           document.getElementById("telaSelect").disabled = true;
+          document.getElementById("btnEditTela").disabled = true;
+          
+          if (julioInput) {
+              julioInput.value = data.openLog.julio || (data.state.julio_actual || "");
+              julioInput.disabled = true;
+          }
+
+          if (fajaInicioInput) {
+              fajaInicioInput.disabled = true;
+              // If loaded from log, show what was saved. 
+              // If saved was 1, show 0 to be consistent? 
+              // User sees "0" at start, should see "0" during turn.
+              const logVal = data.openLog.faja_inicio;
+              fajaInicioInput.value = (logVal === 1) ? 0 : logVal;
+          }
           
           document.getElementById("ayudante").value = data.openLog.ayudante_nombre || "";
-          document.getElementById("fajaFin").min = data.openLog.faja_inicio;
-          document.getElementById("fajaFin").value = data.state.siguiente_faja; 
+          document.getElementById("operador").value = data.openLog.operador_nombre || "";
+
+          // Restaurar lógica de Faja Fin -> Ahora es Cantidad
+          const fajaFinInput = document.getElementById("fajaFin");
+          if (fajaFinInput) {
+              fajaFinInput.value = ""; // Siempre limpio al cargar
+              fajaFinInput.dataset.start = data.openLog.faja_inicio;
+              
+              // Get total fajas
+              if (fabricsMap[data.openLog.fabric_id]) {
+                  fajaFinInput.dataset.total = fabricsMap[data.openLog.fabric_id].total_fajas;
+              }
+          }
+          
         } else {
           setStatus("Sin turno abierto", "text-bg-secondary");
-          document.getElementById("btnStart").disabled = false;
+          document.getElementById("startTimeDisplay").textContent = "";
+          // document.getElementById("btnStart").disabled = false; // Controlled by checkJulioBlocking
           document.getElementById("btnEnd").disabled = true;
+
+          // Ocultar campos de fin de turno
+          document.getElementById("endShiftFields").classList.add("d-none");
 
           // Habilitar campos
           document.getElementById("encargado").disabled = false;
           document.getElementById("encargado").value = assignedEncargado;
           document.getElementById("telaSelect").disabled = false;
+          document.getElementById("btnEditTela").disabled = false;
+          
+          if (julioInput) {
+              julioInput.disabled = false;
+          }
 
-          document.getElementById("fajaFin").min = data.state.siguiente_faja;
-          document.getElementById("fajaFin").value = "";
+          if (fajaInicioInput) {
+              fajaInicioInput.disabled = false;
+          }
+
+          const fajaFinInput = document.getElementById("fajaFin");
+          if (fajaFinInput) {
+               fajaFinInput.value = "";
+          }
+          
+          checkJulioBlocking(); // Apply blocking logic based on Julio value
         }
       } catch (e) {
         setErr(e.message);
+      } finally {
+        setTimeout(() => {
+             btnRefresh.disabled = false;
+             btnRefresh.innerHTML = originalText;
+        }, 300);
       }
     }
 
     document.getElementById("refresh").addEventListener("click", load);
+    
+    // --- Handlers ---
+    
+    // START TURN
+    document.getElementById("btnStart").onclick = async () => {
+        const enc = document.getElementById("encargado").value;
+        const ayu = document.getElementById("ayudante").value;
+        const op = document.getElementById("operador").value;
+        const fabricId = document.getElementById("telaSelect").value;
+        const fajaInicio = document.getElementById("fajaInicioInput").value;
+        const julio = document.getElementById("julioInput").value;
 
-    document.getElementById("btnStart").addEventListener("click", async () => {
-      clearErr();
-      try {
-        const ayudante_nombre = document.getElementById("ayudante").value.trim();
-        const encargado_nombre = document.getElementById("encargado").value.trim();
-        const fabric_id = document.getElementById("telaSelect").value;
+        if (!julio) return setErr("El campo Julio es requerido.");
+        if (!enc) return setErr("Encargado requerido");
+        if (!validateName(enc)) return setErr("El nombre del Encargado debe incluir Nombre y Apellido");
+        if (ayu && !validateName(ayu)) return setErr("El Ayudante debe tener Nombre y Apellido.");
+        if (op && !validateName(op)) return setErr("El Operador debe tener Nombre y Apellido.");
+        if (!fabricId) return setErr("Seleccione una tela");
         
-        await api(`/api/stations/${stationId}/start`, {
-          method: "POST",
-          body: JSON.stringify({ ayudante_nombre, encargado_nombre, fabric_id })
+        // Convert display 0 to internal 1
+        const fajaInicioVal = (Number(fajaInicio) === 0) ? 1 : Number(fajaInicio);
+
+        try {
+            await api(`/api/stations/${stationId}/start`, {
+                method: "POST",
+                body: JSON.stringify({
+                    encargado_nombre: enc,
+                    ayudante_nombre: ayu,
+                    operador_nombre: op,
+                    fabric_id: fabricId,
+                    faja_inicio: fajaInicioVal,
+                    julio: julio
+                })
+            });
+            load();
+        } catch (e) {
+            setErr(e.message);
+        }
+    };
+
+    // Check Julio Blocking
+    function checkJulioBlocking() {
+        const julioInput = document.getElementById("julioInput");
+        if (!julioInput) return;
+        
+        const julioVal = julioInput.value;
+        const isBlocked = !julioVal;
+        
+        // Don't mess with disabled state if shift is open
+        const statusBadge = document.getElementById("statusBadge");
+        if (statusBadge && statusBadge.textContent.includes("Turno ABIERTO")) {
+            return;
+        }
+
+        const elements = ["btnStart"];
+        elements.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.disabled = isBlocked;
         });
-        await load();
-      } catch (e) {
-        setErr(e.message);
-      }
+    }
+
+    // Add listener
+    const jInput = document.getElementById("julioInput");
+    if (jInput) {
+        jInput.addEventListener("input", checkJulioBlocking);
+    }
+
+    // END TURN
+    document.getElementById("btnEnd").onclick = async () => {
+        const ayu = document.getElementById("ayudante").value;
+        const obs = document.getElementById("obs").value;
+        const estadoUrdido = document.getElementById("estadoUrdido").value;
+        const fajaFinInput = document.getElementById("fajaFin");
+        const fajaFinVal = fajaFinInput.value; 
+        
+        if (!estadoUrdido) return setErr("Seleccione el Estado de Urdido");
+        if (ayu && !validateName(ayu)) return setErr("El Ayudante debe tener Nombre y Apellido.");
+
+        // Logic for Quantity -> Absolute
+        let finalFaja = null;
+        
+        if (fajaFinVal) {
+             const qty = Number(fajaFinVal);
+             if (qty < 0) return setErr("La cantidad no puede ser negativa");
+             
+             const start = Number(fajaFinInput.dataset.start);
+             const total = Number(fajaFinInput.dataset.total) || 99999;
+             
+             // Calculate absolute final faja
+             // If start=1, qty=1 -> final=1. (1+1-1)
+             // If start=4, qty=2 -> final=5. (4+2-1)
+             if (qty > 0) {
+                 finalFaja = start + qty - 1;
+                 
+                 if (finalFaja > total) {
+                      return setErr("El numero de fajas esta completo para la tela");
+                 }
+             }
+        }
+
+        try {
+            const res = await api(`/api/stations/${stationId}/end`, {
+                method: "POST",
+                body: JSON.stringify({
+                    faja_fin: finalFaja, 
+                    ayudante_nombre: ayu,
+                    observaciones: obs,
+                    estado_urdido: estadoUrdido
+                })
+            });
+            if (res.completed) {
+                alert("¡Tela completada! La estación se reiniciará para la siguiente.");
+            }
+            load();
+        } catch (e) {
+            setErr(e.message);
+        }
+    };
+
+    document.addEventListener("DOMContentLoaded", () => {
+        fabricModal = new bootstrap.Modal(document.getElementById('fabricModal'));
+    });
+
+    document.getElementById("btnEditTela").addEventListener("click", () => {
+        document.getElementById("modalFamilia").value = "";
+        document.getElementById("modalTipo").value = "";
+        document.getElementById("modalFajas").value = "";
+        document.getElementById("modalErr").classList.add("d-none");
+        fabricModal.show();
+    });
+
+    document.getElementById("btnSaveFabric").addEventListener("click", async () => {
+        const familia = document.getElementById("modalFamilia").value;
+        const tipo = document.getElementById("modalTipo").value.trim();
+        const fajas = document.getElementById("modalFajas").value;
+        const errDiv = document.getElementById("modalErr");
+
+        if (!familia || !tipo || !fajas) {
+            errDiv.textContent = "Complete todos los campos";
+            errDiv.classList.remove("d-none");
+            return;
+        }
+
+        try {
+            const res = await api("/api/fabrics", {
+                method: "POST",
+                body: JSON.stringify({ familia, tipo, total_fajas: fajas })
+            });
+            
+            await loadLists(); 
+            
+            const sel = document.getElementById("telaSelect");
+            sel.value = res.id;
+            sel.dispatchEvent(new Event('change'));
+
+            fabricModal.hide();
+        } catch (e) {
+            errDiv.textContent = e.message;
+            errDiv.classList.remove("d-none");
+        }
     });
 
     // Init
     (async () => {
         try { await loadLists(); } catch (e) { console.error("List error:", e); }
         try { await load(); } catch (e) { console.error("Load error:", e); }
-    })();
-
-    document.getElementById("btnEnd").addEventListener("click", async () => {
-      clearErr();
-      try {
-        const ayudante_nombre = document.getElementById("ayudante").value.trim();
-        const faja_fin = Number(document.getElementById("fajaFin").value);
-        const observaciones = document.getElementById("obs").value.trim();
-
-        await api(`/api/stations/${stationId}/end`, {
-          method: "POST",
-          body: JSON.stringify({ faja_fin, ayudante_nombre, observaciones })
-        });
-        await load();
-      } catch (e) {
-        setErr(e.message);
-      }
-    });
-
-    load();
+    })(); 
   </script>
 </body>
 </html>
