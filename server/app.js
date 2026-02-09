@@ -518,6 +518,24 @@ app.get("/api/health", async (req, res) => {
 // Auto-update shifts and users on startup
 (async () => {
     try {
+        // 0. Ensure Staff Table & Data
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS staff (
+                id SERIAL PRIMARY KEY,
+                nombre TEXT NOT NULL UNIQUE,
+                rol TEXT,
+                shift_id INTEGER REFERENCES shifts(id),
+                active BOOLEAN DEFAULT true,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+        // Add requested staff
+        await pool.query(`
+            INSERT INTO staff (nombre, rol, active)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (nombre) DO UPDATE SET active = true
+        `, ['Alonso Perez Tomas Miguel', 'OPERADOR', true]);
+        
         // 1. Sync Shifts
         await pool.query(`
             UPDATE shifts SET hora_inicio = '07:00', hora_fin = '15:00' WHERE nombre = 'T1';
@@ -538,7 +556,7 @@ app.get("/api/health", async (req, res) => {
             `, [username, hash, name, role]);
         };
 
-        await upsertUser('super1', 'carpe1', 'Supervisor 1', 'SUPERVISOR');
+        await upsertUser('super1', 'carpe1', 'Alonso Perez Tomas Miguel', 'SUPERVISOR');
         await upsertUser('super2', 'carpe2', 'Supervisor 2', 'SUPERVISOR');
         await upsertUser('super3', 'carpe3', 'Supervisor 3', 'SUPERVISOR');
         await upsertUser('gerente', 'gerente123', 'Gerente de Planta', 'GERENTE');
@@ -559,7 +577,7 @@ app.get("/api/health", async (req, res) => {
         
         // Supervisor Map
         const supervisorMap = {
-            "T1": "Supervisor 1",
+            "T1": "Alonso Perez Tomas Miguel",
             "T2": "Supervisor 2",
             "T3": "Supervisor 3"
         };
@@ -597,8 +615,9 @@ app.get("/api/staff", authenticateToken, async (req, res) => {
                 SELECT ayudante_nombre as nombre FROM shift_logs WHERE ayudante_nombre IS NOT NULL
                 UNION
                 SELECT operador_nombre as nombre FROM shift_logs WHERE operador_nombre IS NOT NULL
-            ) as t
-            ORDER BY nombre
+                UNION
+                SELECT nombre FROM staff WHERE active = true
+            ) as names ORDER BY nombre
         `);
         res.json(result.rows.map(r => r.nombre));
     } catch (e) {
